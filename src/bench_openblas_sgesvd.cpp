@@ -164,10 +164,9 @@ int main(int argc, char *argv[]) {
   // Create a copy of the original matrices for each iteration
   float *hA_copy = (float*)malloc(sizeof(float) * size_A);
   
-  // Allocate workspace for LAPACK
+  // Determine workspace size for LAPACK
   // For simplicity, we'll use a large workspace
   lapack_int lwork = 5 * std::max(M, N);
-  float *work = (float*)malloc(sizeof(float) * lwork);
   
   // vector to store timing results
   std::vector<float> timings;
@@ -185,37 +184,46 @@ int main(int argc, char *argv[]) {
     memcpy(hA_copy, hA, sizeof(float) * size_A);
     
     // Process each matrix in the batch
-    #pragma omp parallel for
-    for (lapack_int b = 0; b < batch_count; ++b) {
-      float* A_batch = hA_copy + b * strideA;
-      float* S_batch = hS + b * strideS;
-      float* U_batch = hU + b * strideU;
-      float* VT_batch = hVT + b * strideVT;
+    #pragma omp parallel
+    {
+      // Allocate thread-local workspace
+      float *thread_work = (float*)malloc(sizeof(float) * lwork);
       
-      // Compute SVD
-      // LAPACKE_sgesvd parameters:
-      // - matrix_layout: LAPACK_COL_MAJOR for column-major layout
-      // - jobu: 'A', 'S', or 'N' for left singular vectors computation
-      // - jobvt: 'A', 'S', or 'N' for right singular vectors computation
-      // - m: number of rows
-      // - n: number of columns
-      // - a: input/output matrix
-      // - lda: leading dimension of a
-      // - s: output singular values
-      // - u: output left singular vectors
-      // - ldu: leading dimension of u
-      // - vt: output right singular vectors (transposed)
-      // - ldvt: leading dimension of vt
-      // - work: workspace
-      // - lwork: size of workspace
-      lapack_int info = LAPACKE_sgesvd_work(LAPACK_COL_MAJOR, jobu, jobvt, 
-                                           M, N, A_batch, lda, S_batch, 
-                                           U_batch, ldu, VT_batch, ldvt, 
-                                           work, lwork);
+      #pragma omp for
+      for (lapack_int b = 0; b < batch_count; ++b) {
+        float* A_batch = hA_copy + b * strideA;
+        float* S_batch = hS + b * strideS;
+        float* U_batch = hU + b * strideU;
+        float* VT_batch = hVT + b * strideVT;
+        
+        // Compute SVD
+        // LAPACKE_sgesvd parameters:
+        // - matrix_layout: LAPACK_COL_MAJOR for column-major layout
+        // - jobu: 'A', 'S', or 'N' for left singular vectors computation
+        // - jobvt: 'A', 'S', or 'N' for right singular vectors computation
+        // - m: number of rows
+        // - n: number of columns
+        // - a: input/output matrix
+        // - lda: leading dimension of a
+        // - s: output singular values
+        // - u: output left singular vectors
+        // - ldu: leading dimension of u
+        // - vt: output right singular vectors (transposed)
+        // - ldvt: leading dimension of vt
+        // - work: thread-local workspace
+        // - lwork: size of workspace
+        lapack_int info = LAPACKE_sgesvd_work(LAPACK_COL_MAJOR, jobu, jobvt, 
+                                             M, N, A_batch, lda, S_batch, 
+                                             U_batch, ldu, VT_batch, ldvt, 
+                                             thread_work, lwork);
       
-      if (info != 0) {
-        printf("LAPACKE_sgesvd failed for matrix %d with error %d\n", (int)b, (int)info);
+        if (info != 0) {
+          printf("LAPACKE_sgesvd failed for matrix %d with error %d\n", (int)b, (int)info);
+        }
       }
+      
+      // Free thread-local workspace
+      free(thread_work);
     }
     
     warmup_count++;
@@ -236,22 +244,31 @@ int main(int argc, char *argv[]) {
     auto start = std::chrono::high_resolution_clock::now();
     
     // Process each matrix in the batch
-    #pragma omp parallel for
-    for (lapack_int b = 0; b < batch_count; ++b) {
-      float* A_batch = hA_copy + b * strideA;
-      float* S_batch = hS + b * strideS;
-      float* U_batch = hU + b * strideU;
-      float* VT_batch = hVT + b * strideVT;
+    #pragma omp parallel
+    {
+      // Allocate thread-local workspace
+      float *thread_work = (float*)malloc(sizeof(float) * lwork);
       
-      // Compute SVD
-      lapack_int info = LAPACKE_sgesvd_work(LAPACK_COL_MAJOR, jobu, jobvt, 
-                                           M, N, A_batch, lda, S_batch, 
-                                           U_batch, ldu, VT_batch, ldvt, 
-                                           work, lwork);
+      #pragma omp for
+      for (lapack_int b = 0; b < batch_count; ++b) {
+        float* A_batch = hA_copy + b * strideA;
+        float* S_batch = hS + b * strideS;
+        float* U_batch = hU + b * strideU;
+        float* VT_batch = hVT + b * strideVT;
+        
+        // Compute SVD
+        lapack_int info = LAPACKE_sgesvd_work(LAPACK_COL_MAJOR, jobu, jobvt, 
+                                             M, N, A_batch, lda, S_batch, 
+                                             U_batch, ldu, VT_batch, ldvt, 
+                                             thread_work, lwork);
       
-      //if (info != 0) {
-      //  printf("LAPACKE_sgesvd failed for matrix %d with error %d\n", (int)b, (int)info);
-      //}
+        //if (info != 0) {
+        //  printf("LAPACKE_sgesvd failed for matrix %d with error %d\n", (int)b, (int)info);
+        //}
+      }
+      
+      // Free thread-local workspace
+      free(thread_work);
     }
     
     // stop timing
@@ -289,7 +306,6 @@ int main(int argc, char *argv[]) {
   free(hS);
   free(hU);
   free(hVT);
-  free(work);
   
   return 0;
 }

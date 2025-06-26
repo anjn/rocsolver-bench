@@ -115,11 +115,20 @@ int main(int argc, char *argv[]) {
   size_t strideW = N;                              // stride of eigenvalues
   size_t size_W = strideW * (size_t)batch_count;   // elements in array for eigenvalues
 
-  // allocate memory for eigenvalues and workspace
+  // allocate memory for eigenvalues
   float *hW = (float*)malloc(sizeof(float) * size_W);
   
   // Create a copy of the original matrices for each iteration
   float *hA_copy = (float*)malloc(sizeof(float) * size_A);
+  
+  // Query the optimal workspace size
+  lapack_int lwork = -1;  // Signal to query optimal size
+  float work_query;
+  lapack_int info = LAPACKE_ssyev_work(LAPACK_COL_MAJOR, 'V', 'U', 
+                                      N, NULL, lda, NULL, &work_query, lwork);
+  
+  // Get the optimal workspace size
+  lwork = (lapack_int)work_query;
   
   // vector to store timing results
   std::vector<float> timings;
@@ -137,26 +146,37 @@ int main(int argc, char *argv[]) {
     memcpy(hA_copy, hA, sizeof(float) * size_A);
     
     // Process each matrix in the batch
-    #pragma omp parallel for
-    for (lapack_int b = 0; b < batch_count; ++b) {
-      float* A_batch = hA_copy + b * strideA;
-      float* W_batch = hW + b * strideW;
+    #pragma omp parallel
+    {
+      // Allocate thread-local workspace
+      float *thread_work = (float*)malloc(sizeof(float) * lwork);
       
-      // Compute eigenvalues and eigenvectors
-      // LAPACKE_ssyev parameters:
-      // - matrix_layout: LAPACK_COL_MAJOR for column-major layout
-      // - jobz: 'V' to compute both eigenvalues and eigenvectors
-      // - uplo: 'U' to use upper triangular part of the matrix
-      // - n: matrix dimension
-      // - a: input/output matrix
-      // - lda: leading dimension of a
-      // - w: output eigenvalues
-      lapack_int info = LAPACKE_ssyev(LAPACK_COL_MAJOR, 'V', 'U', 
-                                     N, A_batch, lda, W_batch);
+      #pragma omp for
+      for (lapack_int b = 0; b < batch_count; ++b) {
+        float* A_batch = hA_copy + b * strideA;
+        float* W_batch = hW + b * strideW;
+        
+        // Compute eigenvalues and eigenvectors using _work variant with thread-local workspace
+        // LAPACKE_ssyev_work parameters:
+        // - matrix_layout: LAPACK_COL_MAJOR for column-major layout
+        // - jobz: 'V' to compute both eigenvalues and eigenvectors
+        // - uplo: 'U' to use upper triangular part of the matrix
+        // - n: matrix dimension
+        // - a: input/output matrix
+        // - lda: leading dimension of a
+        // - w: output eigenvalues
+        // - work: workspace array (thread-local)
+        // - lwork: size of workspace
+        lapack_int info = LAPACKE_ssyev_work(LAPACK_COL_MAJOR, 'V', 'U', 
+                                            N, A_batch, lda, W_batch, thread_work, lwork);
       
-      if (info != 0) {
-        printf("LAPACKE_ssyev failed for matrix %d with error %d\n", (int)b, (int)info);
+        if (info != 0) {
+          printf("LAPACKE_ssyev failed for matrix %d with error %d\n", (int)b, (int)info);
+        }
       }
+      
+      // Free thread-local workspace
+      free(thread_work);
     }
     
     warmup_count++;
@@ -177,18 +197,27 @@ int main(int argc, char *argv[]) {
     auto start = std::chrono::high_resolution_clock::now();
     
     // Process each matrix in the batch
-    #pragma omp parallel for
-    for (lapack_int b = 0; b < batch_count; ++b) {
-      float* A_batch = hA_copy + b * strideA;
-      float* W_batch = hW + b * strideW;
+    #pragma omp parallel
+    {
+      // Allocate thread-local workspace
+      float *thread_work = (float*)malloc(sizeof(float) * lwork);
       
-      // Compute eigenvalues and eigenvectors
-      lapack_int info = LAPACKE_ssyev(LAPACK_COL_MAJOR, 'V', 'U', 
-                                     N, A_batch, lda, W_batch);
+      #pragma omp for
+      for (lapack_int b = 0; b < batch_count; ++b) {
+        float* A_batch = hA_copy + b * strideA;
+        float* W_batch = hW + b * strideW;
+        
+        // Compute eigenvalues and eigenvectors using _work variant with thread-local workspace
+        lapack_int info = LAPACKE_ssyev_work(LAPACK_COL_MAJOR, 'V', 'U', 
+                                            N, A_batch, lda, W_batch, thread_work, lwork);
       
-      //if (info != 0) {
-      //  printf("LAPACKE_ssyev failed for matrix %d with error %d\n", (int)b, (int)info);
-      //}
+        //if (info != 0) {
+        //  printf("LAPACKE_ssyev failed for matrix %d with error %d\n", (int)b, (int)info);
+        //}
+      }
+      
+      // Free thread-local workspace
+      free(thread_work);
     }
     
     // stop timing
