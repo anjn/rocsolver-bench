@@ -30,6 +30,7 @@ foreach(TARGET ${TARGETS})
 
     target_compile_options(
         ${TARGET} PRIVATE
+        -fopenmp
         -Wno-unused-result
     )
 
@@ -51,6 +52,7 @@ foreach(TARGET ${TARGETS})
     target_link_libraries(
         ${TARGET} PRIVATE
         -L/opt/rocm/lib -lrocsolver -lrocblas
+        -fopenmp
         argparse
     )
     

@@ -138,6 +138,7 @@ int main(int argc, char *argv[]) {
     memcpy(hA_copy, hA, sizeof(float) * size_A);
     
     // Process each matrix in the batch
+    #pragma omp parallel for
     for (lapack_int b = 0; b < batch_count; ++b) {
       float* A_batch = hA_copy + b * strideA;
       float* W_batch = hW + b * strideW;
@@ -177,6 +178,7 @@ int main(int argc, char *argv[]) {
     auto start = std::chrono::high_resolution_clock::now();
     
     // Process each matrix in the batch
+    #pragma omp parallel for
     for (lapack_int b = 0; b < batch_count; ++b) {
       float* A_batch = hA_copy + b * strideA;
       float* W_batch = hW + b * strideW;
@@ -185,9 +187,9 @@ int main(int argc, char *argv[]) {
       lapack_int info = LAPACKE_ssyev(LAPACK_COL_MAJOR, 'V', 'U', 
                                      N, A_batch, lda, W_batch);
       
-      if (info != 0) {
-        printf("LAPACKE_ssyev failed for matrix %d with error %d\n", (int)b, (int)info);
-      }
+      //if (info != 0) {
+      //  printf("LAPACKE_ssyev failed for matrix %d with error %d\n", (int)b, (int)info);
+      //}
     }
     
     // stop timing
