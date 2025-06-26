@@ -17,6 +17,7 @@ set(TARGETS
     bench_rocsolver_ssyevj_strided_batched
     bench_rocsolver_sgesvdj_strided_batched
     bench_openblas_ssyev
+    bench_openblas_ssyevd
     bench_openblas_sgesvd
 )
 
