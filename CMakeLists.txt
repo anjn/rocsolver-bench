@@ -16,6 +16,8 @@ set(TARGETS
     bench_rocsolver_dgeqrf_batched
     bench_rocsolver_ssyevj_strided_batched
     bench_rocsolver_sgesvdj_strided_batched
+    bench_openblas_ssyevj_strided_batched
+    bench_openblas_sgesvdj_strided_batched
 )
 
 set(CMAKE_CXX_COMPILER /opt/rocm/bin/hipcc)
@@ -36,10 +38,27 @@ foreach(TARGET ${TARGETS})
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         /opt/rocm/include
     )
+    
+    # Add OpenBLAS include directories for CPU benchmarks
+    if(${TARGET} MATCHES "bench_openblas_.*")
+        target_include_directories(
+            ${TARGET} PRIVATE
+            /usr/include/openblas
+            /usr/include
+        )
+    endif()
 
     target_link_libraries(
         ${TARGET} PRIVATE
         -L/opt/rocm/lib -lrocsolver -lrocblas
         argparse
     )
+    
+    # Add OpenBLAS for CPU benchmarks if needed
+    if(${TARGET} MATCHES "bench_openblas_.*")
+        target_link_libraries(
+            ${TARGET} PRIVATE
+            openblas lapacke
+        )
+    endif()
 endforeach(TARGET)
