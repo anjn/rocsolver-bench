@@ -11,23 +11,23 @@
 
 // Example: Compute the QR Factorizations of an array of matrices on the GPU
 
-double *create_example_matrices(rocblas_int *M_out,
-                                rocblas_int *N_out,
-                                rocblas_int *lda_out,
-                                rocblas_stride *strideA_out,
-                                rocblas_int *batch_count_out,
-                                int random_seed) {
+double *create_matrices_for_dgeqrf_strided_batched(rocblas_int M,
+                                                  rocblas_int N,
+                                                  rocblas_int lda,
+                                                  rocblas_stride strideA,
+                                                  rocblas_int batch_count,
+                                                  int random_seed) {
   // allocate space for input matrix data on CPU
-  double *hA = (double*)malloc(sizeof(double) * (*strideA_out) * (*batch_count_out));
+  double *hA = (double*)malloc(sizeof(double) * strideA * batch_count);
 
   // generate random matrices
   std::mt19937 gen(random_seed);
   std::uniform_real_distribution<double> dis(-100.0, 100.0);
   
-  for (rocblas_int b = 0; b < *batch_count_out; ++b) {
-    for (rocblas_int i = 0; i < *M_out; ++i) {
-      for (rocblas_int j = 0; j < *N_out; ++j) {
-        hA[i + j * (*lda_out) + b * (*strideA_out)] = dis(gen);
+  for (rocblas_int b = 0; b < batch_count; ++b) {
+    for (rocblas_int i = 0; i < M; ++i) {
+      for (rocblas_int j = 0; j < N; ++j) {
+        hA[i + j * lda + b * strideA] = dis(gen);
       }
     }
   }
@@ -107,8 +107,8 @@ int main(int argc, char *argv[]) {
     strideA = lda * N;
   }
   
-  // create_example_matrices関数の呼び出し
-  double *hA = create_example_matrices(&M, &N, &lda, &strideA, &batch_count, random_seed);
+  // create_matrices_for_dgeqrf_strided_batched関数の呼び出し
+  double *hA = create_matrices_for_dgeqrf_strided_batched(M, N, lda, strideA, batch_count, random_seed);
 
 
   // initialization

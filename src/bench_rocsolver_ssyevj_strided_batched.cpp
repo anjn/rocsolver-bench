@@ -11,28 +11,28 @@
 
 // Example: Compute the eigenvalues and eigenvectors of an array of symmetric matrices on the GPU
 
-float *create_symmetric_matrices(rocblas_int *n_out,
-                               rocblas_int *lda_out,
-                               rocblas_stride *strideA_out,
-                               rocblas_int *batch_count_out,
-                               int random_seed) {
+float *create_matrices_for_ssyevj_strided_batched(rocblas_int N,
+                                                 rocblas_int lda,
+                                                 rocblas_stride strideA,
+                                                 rocblas_int batch_count,
+                                                 int random_seed) {
   // allocate space for input matrix data on CPU
-  float *hA = (float*)malloc(sizeof(float) * (*strideA_out) * (*batch_count_out));
+  float *hA = (float*)malloc(sizeof(float) * strideA * batch_count);
 
   // generate random symmetric matrices
   std::mt19937 gen(random_seed);
   std::uniform_real_distribution<float> dis(-10.0, 10.0);
   
-  for (rocblas_int b = 0; b < *batch_count_out; ++b) {
-    for (rocblas_int i = 0; i < *n_out; ++i) {
+  for (rocblas_int b = 0; b < batch_count; ++b) {
+    for (rocblas_int i = 0; i < N; ++i) {
       // Diagonal elements
-      hA[i + i * (*lda_out) + b * (*strideA_out)] = dis(gen) * 10.0; // Make diagonal dominant
+      hA[i + i * lda + b * strideA] = dis(gen) * 10.0; // Make diagonal dominant
       
       // Off-diagonal elements (ensure symmetry)
-      for (rocblas_int j = i + 1; j < *n_out; ++j) {
+      for (rocblas_int j = i + 1; j < N; ++j) {
         float value = dis(gen);
-        hA[i + j * (*lda_out) + b * (*strideA_out)] = value;
-        hA[j + i * (*lda_out) + b * (*strideA_out)] = value; // Symmetric counterpart
+        hA[i + j * lda + b * strideA] = value;
+        hA[j + i * lda + b * strideA] = value; // Symmetric counterpart
       }
     }
   }
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
       .default_value(1e-7f)
       .scan<'f', float>();
       
-  program.add_argument("-m", "--max-sweeps")
+  program.add_argument("-j", "--max-sweeps")
       .help("Maximum number of sweeps for Jacobi method")
       .default_value(100)
       .scan<'i', int>();
@@ -118,8 +118,8 @@ int main(int argc, char *argv[]) {
     strideA = lda * N;
   }
   
-  // create_symmetric_matrices関数の呼び出し
-  float *hA = create_symmetric_matrices(&N, &lda, &strideA, &batch_count, random_seed);
+  // create_matrices_for_ssyevj_strided_batched関数の呼び出し
+  float *hA = create_matrices_for_ssyevj_strided_batched(N, lda, strideA, batch_count, random_seed);
 
   // initialization
   rocblas_handle handle;

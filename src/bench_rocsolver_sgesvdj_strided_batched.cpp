@@ -11,23 +11,23 @@
 
 // Example: Compute the singular values and singular vectors of an array of general matrices on the GPU
 
-float *create_general_matrices(rocblas_int *m_out,
-                               rocblas_int *n_out,
-                               rocblas_int *lda_out,
-                               rocblas_stride *strideA_out,
-                               rocblas_int *batch_count_out,
-                               int random_seed) {
+float *create_matrices_for_sgesvdj_strided_batched(rocblas_int M,
+                                                  rocblas_int N,
+                                                  rocblas_int lda,
+                                                  rocblas_stride strideA,
+                                                  rocblas_int batch_count,
+                                                  int random_seed) {
   // allocate space for input matrix data on CPU
-  float *hA = (float*)malloc(sizeof(float) * (*strideA_out) * (*batch_count_out));
+  float *hA = (float*)malloc(sizeof(float) * strideA * batch_count);
 
   // generate random general matrices
   std::mt19937 gen(random_seed);
   std::uniform_real_distribution<float> dis(-10.0, 10.0);
   
-  for (rocblas_int b = 0; b < *batch_count_out; ++b) {
-    for (rocblas_int i = 0; i < *m_out; ++i) {
-      for (rocblas_int j = 0; j < *n_out; ++j) {
-        hA[i + j * (*lda_out) + b * (*strideA_out)] = dis(gen);
+  for (rocblas_int b = 0; b < batch_count; ++b) {
+    for (rocblas_int i = 0; i < M; ++i) {
+      for (rocblas_int j = 0; j < N; ++j) {
+        hA[i + j * lda + b * strideA] = dis(gen);
       }
     }
   }
@@ -148,8 +148,8 @@ int main(int argc, char *argv[]) {
     right_svect = rocblas_svect_all;
   }
   
-  // create_general_matrices関数の呼び出し
-  float *hA = create_general_matrices(&M, &N, &lda, &strideA, &batch_count, random_seed);
+  // create_matrices_for_sgesvdj_strided_batched関数の呼び出し
+  float *hA = create_matrices_for_sgesvdj_strided_batched(M, N, lda, strideA, batch_count, random_seed);
 
   // initialization
   rocblas_handle handle;
