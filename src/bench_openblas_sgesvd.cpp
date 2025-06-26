@@ -13,12 +13,12 @@
 
 // Example: Compute the singular values and singular vectors of an array of general matrices on the CPU using OpenBLAS
 
-float *create_matrices_for_sgesvdj_strided_batched(lapack_int M,
-                                                  lapack_int N,
-                                                  lapack_int lda,
-                                                  size_t strideA,
-                                                  lapack_int batch_count,
-                                                  int random_seed) {
+float *create_matrices(lapack_int M,
+                      lapack_int N,
+                      lapack_int lda,
+                      size_t strideA,
+                      lapack_int batch_count,
+                      int random_seed) {
   // allocate space for input matrix data on CPU
   float *hA = (float*)malloc(sizeof(float) * strideA * batch_count);
 
@@ -40,7 +40,7 @@ float *create_matrices_for_sgesvdj_strided_batched(lapack_int M,
 // Use LAPACKE_sgesvd to compute singular values and singular vectors of an array of general matrices.
 int main(int argc, char *argv[]) {
   // ArgumentParserの設定
-  argparse::ArgumentParser program("bench_openblas_sgesvdj_strided_batched");
+  argparse::ArgumentParser program("bench_openblas_sgesvd");
   
   program.add_argument("-m", "--rows")
       .help("Number of rows (M)")
@@ -138,8 +138,7 @@ int main(int argc, char *argv[]) {
     jobvt = 'A'; // All N rows of V^T are returned in the array VT
   }
   
-  // create_matrices_for_sgesvdj_strided_batched関数の呼び出し
-  float *hA = create_matrices_for_sgesvdj_strided_batched(M, N, lda, strideA, batch_count, random_seed);
+  float *hA = create_matrices(M, N, lda, strideA, batch_count, random_seed);
 
   // calculate the sizes of our arrays
   size_t size_A = strideA * (size_t)batch_count;   // elements in array for matrices

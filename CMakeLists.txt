@@ -16,8 +16,8 @@ set(TARGETS
     bench_rocsolver_dgeqrf_batched
     bench_rocsolver_ssyevj_strided_batched
     bench_rocsolver_sgesvdj_strided_batched
-    bench_openblas_ssyevj_strided_batched
-    bench_openblas_sgesvdj_strided_batched
+    bench_openblas_ssyev
+    bench_openblas_sgesvd
 )
 
 set(CMAKE_CXX_COMPILER /opt/rocm/bin/hipcc)
